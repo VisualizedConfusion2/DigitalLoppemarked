@@ -7,5 +7,17 @@ Thumbs.db
 .idea/
 *.swp
 
+## .NET build artifacts
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+## Additional common ones
+*.cache
+rpswa.dswa.cache.json
+staticwebassets.removed.txt
+
 # Logs
 *.log
