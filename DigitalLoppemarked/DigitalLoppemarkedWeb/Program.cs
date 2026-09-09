@@ -1,4 +1,6 @@
+using DigitalLoppemarkedLib.Service;
 using DigitalLoppemarkedWeb.Components;
+using Microsoft.AspNetCore.Cors.Infrastructure;
 
 namespace DigitalLoppemarkedWeb;
 
@@ -7,6 +9,9 @@ public class Program
     public static void Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
+
+        builder.Services.AddScoped<CartService>();
+        builder.Services.AddScoped<ProductService>();
 
         // Add services to the container.
         builder.Services.AddRazorComponents()
