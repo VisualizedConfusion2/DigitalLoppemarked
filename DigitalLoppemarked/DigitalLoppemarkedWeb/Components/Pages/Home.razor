@@ -6,18 +6,46 @@
 @inject CartService CartService
 
 <div class="container mt-4">
-    <div class="row row-cols-1 row-cols-md-3 g-4">
-        @foreach (var product in products)
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0">Products</h2>
+        <div class="d-flex align-items-center gap-2">
+            <label for="sort" class="form-label mb-0 text-nowrap">Sort by</label>
+            <select id="sort" class="form-select form-select-sm" value="@sort" @onchange="OnSortChanged">
+                <option value="@ProductSort.NameAsc">Name (A–Z)</option>
+                <option value="@ProductSort.NameDesc">Name (Z–A)</option>
+                <option value="@ProductSort.PriceAsc">Price (low–high)</option>
+                <option value="@ProductSort.PriceDesc">Price (high–low)</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="row row-cols-1 row-cols-md-3 g-4 product-grid">
+        @foreach (var product in result.Items)
         {
             <div class="col">
                 <div class="card h-100 shadow-sm">
-                    <img src="@product.ImageUrl" class="card-img-top" alt="@product.Name">
+                    <img src="@product.ImageUrl" class="card-img-top"
+                         style="height: 200px; object-fit: cover;" alt="@product.Name"
+                         onerror="if(!this.src.includes('placeholder.svg')){this.src='images/placeholder.svg';this.style.objectFit='contain';}">
                     <div class="card-body d-flex flex-column">
-                        <h5 class="card-title">@product.Name</h5>
+                        <h5 class="card-title">
+                            <a href="@($"product/{product.Id}")" class="text-decoration-none">@product.Name</a>
+                        </h5>
                         <p class="card-text text-muted flex-grow-1">@product.Description</p>
+
+                        @if (product.StockQuantity > 0)
+                        {
+                            <span class="badge bg-success align-self-start mb-2">In stock (@product.StockQuantity)</span>
+                        }
+                        else
+                        {
+                            <span class="badge bg-secondary align-self-start mb-2">Out of stock</span>
+                        }
+
                         <div class="d-flex justify-content-between align-items-center">
                             <span class="fw-bold">@product.Price.ToString("C")</span>
-                            <button class="btn btn-primary btn-sm" @onclick="() => CartService.AddToCart(product)">
+                            <button class="btn btn-primary btn-sm" disabled="@(product.StockQuantity == 0)"
+                                    @onclick="() => CartService.AddToCart(product)">
                                 <i class="bi bi-cart-plus"></i> Add to Cart
                             </button>
                         </div>
@@ -26,13 +54,60 @@
             </div>
         }
     </div>
+
+    @if (result.TotalPages > 1)
+    {
+        <nav class="mt-4" aria-label="Product pages">
+            <ul class="pagination justify-content-center">
+                <li class="page-item @(result.HasPrevious ? "" : "disabled")">
+                    <button class="page-link" @onclick="() => GoToPage(page - 1)">Previous</button>
+                </li>
+                @for (var i = 1; i <= result.TotalPages; i++)
+                {
+                    var pageNumber = i;
+                    <li class="page-item @(pageNumber == page ? "active" : "")">
+                        <button class="page-link" @onclick="() => GoToPage(pageNumber)">@pageNumber</button>
+                    </li>
+                }
+                <li class="page-item @(result.HasNext ? "" : "disabled")">
+                    <button class="page-link" @onclick="() => GoToPage(page + 1)">Next</button>
+                </li>
+            </ul>
+        </nav>
+    }
 </div>
 
 @code {
-    private List<Product> products = new();
+    private const int PageSize = 6;
+
+    private int page = 1;
+    private ProductSort sort = ProductSort.NameAsc;
+    private PagedResult<Product> result = new();
 
     protected override async Task OnInitializedAsync()
     {
-        products = await ProductService.GetProductsAsync();
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        result = await ProductService.GetProductsAsync(page, PageSize, sort);
+    }
+
+    private async Task GoToPage(int newPage)
+    {
+        if (newPage < 1 || newPage > result.TotalPages) return;
+        page = newPage;
+        await LoadAsync();
+    }
+
+    private async Task OnSortChanged(ChangeEventArgs e)
+    {
+        if (Enum.TryParse<ProductSort>(e.Value?.ToString(), out var newSort))
+        {
+            sort = newSort;
+            page = 1;
+            await LoadAsync();
+        }
     }
 }
