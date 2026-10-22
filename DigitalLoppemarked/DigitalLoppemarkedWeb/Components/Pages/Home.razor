@@ -6,18 +6,57 @@
 @inject CartService CartService
 
 <div class="container mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 gap-3 flex-wrap">
         <h2 class="mb-0">Products</h2>
-        <div class="d-flex align-items-center gap-2">
-            <label for="sort" class="form-label mb-0 text-nowrap">Sort by</label>
-            <select id="sort" class="form-select form-select-sm" value="@sort" @onchange="OnSortChanged">
-                <option value="@ProductSort.NameAsc">Name (A–Z)</option>
-                <option value="@ProductSort.NameDesc">Name (Z–A)</option>
-                <option value="@ProductSort.PriceAsc">Price (low–high)</option>
-                <option value="@ProductSort.PriceDesc">Price (high–low)</option>
-            </select>
+        <div class="d-flex align-items-center gap-2 flex-grow-1 justify-content-end flex-wrap">
+            <form class="d-flex align-items-center gap-2" @onsubmit="OnSearch" @onsubmit:preventDefault>
+                <input type="search" class="form-control form-control-sm" style="min-width: 220px;"
+                       placeholder="Search products…" aria-label="Search products"
+                       maxlength="@ProductService.MaxSearchLength" @bind="searchInput" @bind:event="oninput" />
+                <button type="submit" class="btn btn-outline-primary btn-sm text-nowrap">
+                    <i class="bi bi-search"></i> Search
+                </button>
+                @if (!string.IsNullOrEmpty(searchTerm))
+                {
+                    <button type="button" class="btn btn-outline-secondary btn-sm text-nowrap" @onclick="ClearSearch">
+                        Clear
+                    </button>
+                }
+            </form>
+            <div class="d-flex align-items-center gap-2">
+                <label for="sort" class="form-label mb-0 text-nowrap">Sort by</label>
+                <select id="sort" class="form-select form-select-sm" value="@sort" @onchange="OnSortChanged">
+                    <option value="@ProductSort.NameAsc">Name (A–Z)</option>
+                    <option value="@ProductSort.NameDesc">Name (Z–A)</option>
+                    <option value="@ProductSort.PriceAsc">Price (low–high)</option>
+                    <option value="@ProductSort.PriceDesc">Price (high–low)</option>
+                </select>
+            </div>
         </div>
     </div>
+
+    @if (throttled)
+    {
+        <div class="alert alert-warning" role="alert">
+            You are searching too quickly. Please slow down and try again in a moment.
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(searchTerm))
+    {
+        @* searchTerm is rendered as plain text, so Blazor HTML-encodes it — a reflected
+           XSS payload like <script> is shown literally and never executed (story 7). *@
+        <p class="text-muted">
+            @result.TotalCount result(s) for <strong>"@searchTerm"</strong>
+        </p>
+    }
+
+    @if (!throttled && result.TotalCount == 0 && !string.IsNullOrEmpty(searchTerm))
+    {
+        <div class="alert alert-info" role="alert">
+            No products match your search. Try a different keyword.
+        </div>
+    }
 
     <div class="row row-cols-1 row-cols-md-3 g-4 product-grid">
         @foreach (var product in result.Items)
@@ -80,9 +119,22 @@
 @code {
     private const int PageSize = 6;
 
+    // Per-circuit search throttle: at most this many searches per rolling window.
+    // Blazor Server interactions travel over the SignalR circuit rather than as separate
+    // HTTP requests, so this component-level limiter is what actually curbs search DoS
+    // for an interactive session (the named "search" rate-limit policy in Program.cs
+    // covers the HTTP-rendered path). See story 7.
+    private const int MaxSearchesPerWindow = 20;
+    private static readonly TimeSpan SearchWindow = TimeSpan.FromMinutes(1);
+    private readonly List<DateTime> _searchTimes = new();
+
     private int page = 1;
     private ProductSort sort = ProductSort.NameAsc;
     private PagedResult<Product> result = new();
+
+    private string searchInput = "";
+    private string searchTerm = "";
+    private bool throttled;
 
     protected override async Task OnInitializedAsync()
     {
@@ -91,7 +143,45 @@
 
     private async Task LoadAsync()
     {
-        result = await ProductService.GetProductsAsync(page, PageSize, sort);
+        result = string.IsNullOrWhiteSpace(searchTerm)
+            ? await ProductService.GetProductsAsync(page, PageSize, sort)
+            : await ProductService.SearchAsync(searchTerm, page, PageSize, sort);
+    }
+
+    private async Task OnSearch()
+    {
+        if (IsRateLimited())
+        {
+            throttled = true;
+            return;
+        }
+
+        throttled = false;
+        searchTerm = (searchInput ?? "").Trim();
+        page = 1;
+        await LoadAsync();
+    }
+
+    private async Task ClearSearch()
+    {
+        searchInput = "";
+        searchTerm = "";
+        throttled = false;
+        page = 1;
+        await LoadAsync();
+    }
+
+    // Prunes timestamps outside the window, then records this attempt. Returns true when
+    // the caller has exceeded the allowed number of searches in the current window.
+    private bool IsRateLimited()
+    {
+        var now = DateTime.UtcNow;
+        _searchTimes.RemoveAll(t => now - t > SearchWindow);
+        if (_searchTimes.Count >= MaxSearchesPerWindow)
+            return true;
+
+        _searchTimes.Add(now);
+        return false;
     }
 
     private async Task GoToPage(int newPage)

@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace DigitalLoppemarkedLib.Service
@@ -28,6 +29,15 @@ namespace DigitalLoppemarkedLib.Service
         // Defensive upper bound so a manipulated page size can't request huge pages.
         private const int MaxPageSize = 50;
 
+        // Story 7 (Søgning): the search term is validated and length-limited so it can't
+        // be abused for injection or DoS. Allow only Unicode letters (incl. æøå), digits,
+        // whitespace and hyphen — this rejects SQLi/XSS payloads such as ' OR 1=1 --,
+        // '; DROP TABLE ... and <script>...</script> outright.
+        public const int MaxSearchLength = 100;
+
+        private static readonly Regex AllowedSearch =
+            new(@"^[\p{L}\p{N}\s\-]*$", RegexOptions.Compiled);
+
         public Task<List<Product>> GetProductsAsync()
         {
             return Task.FromResult(_products.Where(p => p.IsActive).ToList());
@@ -39,15 +49,7 @@ namespace DigitalLoppemarkedLib.Service
             if (pageSize < 1) pageSize = 6;
             if (pageSize > MaxPageSize) pageSize = MaxPageSize;
 
-            var active = _products.Where(p => p.IsActive);
-
-            IEnumerable<Product> query = sort switch
-            {
-                ProductSort.NameDesc => active.OrderByDescending(p => p.Name),
-                ProductSort.PriceAsc => active.OrderBy(p => p.Price),
-                ProductSort.PriceDesc => active.OrderByDescending(p => p.Price),
-                _ => active.OrderBy(p => p.Name),
-            };
+            var query = ApplySort(_products.Where(p => p.IsActive), sort);
 
             var items = query
                 .Skip((page - 1) * pageSize)
@@ -74,11 +76,59 @@ namespace DigitalLoppemarkedLib.Service
 
         public Task<List<Product>> SearchAsync(string term)
         {
-            var results = _products
-                .Where(p => p.IsActive && p.Name.Contains(term, StringComparison.OrdinalIgnoreCase))
-                .ToList();
-            return Task.FromResult(results);
+            return Task.FromResult(SearchCore(term).ToList());
         }
+
+        // Paged search used by the UI. Reuses the same page/pageSize clamping and sort
+        // options as the browse listing so a manipulated query can't request huge pages.
+        public Task<PagedResult<Product>> SearchAsync(string term, int page, int pageSize, ProductSort sort)
+        {
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 6;
+            if (pageSize > MaxPageSize) pageSize = MaxPageSize;
+
+            var matches = SearchCore(term).ToList();
+            var items = ApplySort(matches, sort)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            var result = new PagedResult<Product>
+            {
+                Items = items,
+                TotalCount = matches.Count,
+                Page = page,
+                PageSize = pageSize
+            };
+
+            return Task.FromResult(result);
+        }
+
+        // Validates the term and returns matching ACTIVE products (name or description).
+        // Storage is an in-memory list queried with LINQ, which is injection-safe by
+        // construction; if/when the ORM-less data layer (story 14) lands, these lookups
+        // must use parameterized commands. An invalid term (empty, too long, or
+        // containing disallowed characters) yields no results rather than throwing, so
+        // SQLi/XSS payloads are neutralised and inactive products stay hidden.
+        private IEnumerable<Product> SearchCore(string term)
+        {
+            term = (term ?? "").Trim();
+            if (term.Length == 0 || term.Length > MaxSearchLength || !AllowedSearch.IsMatch(term))
+                return Enumerable.Empty<Product>();
+
+            return _products.Where(p => p.IsActive &&
+                (p.Name.Contains(term, StringComparison.OrdinalIgnoreCase) ||
+                 p.Description.Contains(term, StringComparison.OrdinalIgnoreCase)));
+        }
+
+        private static IEnumerable<Product> ApplySort(IEnumerable<Product> source, ProductSort sort) =>
+            sort switch
+            {
+                ProductSort.NameDesc => source.OrderByDescending(p => p.Name),
+                ProductSort.PriceAsc => source.OrderBy(p => p.Price),
+                ProductSort.PriceDesc => source.OrderByDescending(p => p.Price),
+                _ => source.OrderBy(p => p.Name),
+            };
 
         public Task<bool> ReduceStockAsync(int productId, int quantity)
         {
