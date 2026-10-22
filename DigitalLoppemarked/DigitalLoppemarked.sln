@@ -1,11 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# 
+#
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DigitalLoppemarkedLib", "DigitalLoppemarkedLib\DigitalLoppemarkedLib.csproj", "{63E121CD-9D10-44B7-B9DD-B81D8ABF61BF}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DigitalLoppemarkedWeb", "DigitalLoppemarkedWeb\DigitalLoppemarkedWeb.csproj", "{A4363A3C-7A0F-4DE2-B510-05CB950833DE}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DigitalLoppemarkedLib.Tests", "DigitalLoppemarkedLib.Tests\DigitalLoppemarkedLib.Tests.csproj", "{E427B9B0-C319-489B-9675-E8FD02767116}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Digital.Loppemarked.Console", "Digital.Loppemarked.Console\Digital.Loppemarked.Console.csproj", "{A1A45B6F-31DB-419B-8A59-752335224B26}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -25,5 +27,9 @@ Global
 		{E427B9B0-C319-489B-9675-E8FD02767116}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E427B9B0-C319-489B-9675-E8FD02767116}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E427B9B0-C319-489B-9675-E8FD02767116}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A1A45B6F-31DB-419B-8A59-752335224B26}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A1A45B6F-31DB-419B-8A59-752335224B26}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A1A45B6F-31DB-419B-8A59-752335224B26}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A1A45B6F-31DB-419B-8A59-752335224B26}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
