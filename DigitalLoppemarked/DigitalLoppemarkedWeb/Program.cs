@@ -29,6 +29,17 @@ public class Program
                         Window = TimeSpan.FromMinutes(1),
                         QueueLimit = 0
                     }));
+
+            // Dedicated, tighter policy for search (story 7). It guards the HTTP-rendered
+            // search path; interactive searches over the SignalR circuit are additionally
+            // throttled per-circuit inside Home.razor, since those don't flow through this
+            // request-pipeline middleware.
+            options.AddFixedWindowLimiter("search", o =>
+            {
+                o.PermitLimit = 20;
+                o.Window = TimeSpan.FromMinutes(1);
+                o.QueueLimit = 0;
+            });
         });
 
         // Add services to the container.
