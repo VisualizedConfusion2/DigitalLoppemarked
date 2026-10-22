@@ -17,7 +17,7 @@ await using var dataSource = dataSourceBuilder.Build();
 var options = new DbContextOptionsBuilder<LoppemarkedDbContext>()
     .UseNpgsql(dataSource)
     .Options;
-
+//67
 await using var db = new LoppemarkedDbContext(options);
 var products = await db.Products.Where(p => p.IsActive).ToListAsync();
 Console.WriteLine($"Loaded {products.Count} products");
