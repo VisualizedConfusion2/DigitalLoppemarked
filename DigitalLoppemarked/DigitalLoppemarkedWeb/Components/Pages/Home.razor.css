@@ -1,0 +1,13 @@
+/* Keep the grid a stable height across pages so switching pages
+   (e.g. a last page with fewer items) doesn't make the layout jump.
+   Two rows of cards on desktop; released on small screens. */
+.product-grid {
+    min-height: 780px;
+    align-content: flex-start;
+}
+
+@media (max-width: 767.98px) {
+    .product-grid {
+        min-height: 0;
+    }
+}

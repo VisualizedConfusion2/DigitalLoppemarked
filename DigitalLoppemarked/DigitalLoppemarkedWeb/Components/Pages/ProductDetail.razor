@@ -1,0 +1,76 @@
+﻿@page "/product/{Id:int}"
+@rendermode InteractiveServer
+@using DigitalLoppemarkedLib.Models
+@using DigitalLoppemarkedLib.Service
+@inject ProductService ProductService
+@inject CartService CartService
+@inject NavigationManager NavigationManager
+
+<div class="container mt-4">
+    <a href="/" class="btn btn-link px-0 mb-3">
+        <i class="bi bi-arrow-left"></i> Back to products
+    </a>
+
+    @if (loading)
+    {
+        <p>Loading…</p>
+    }
+    else if (product is null)
+    {
+        <div class="alert alert-warning">
+            Product not found. <a href="/">Browse all products.</a>
+        </div>
+    }
+    else
+    {
+        <div class="row g-4">
+            <div class="col-md-5">
+                <img src="@product.ImageUrl" class="img-fluid rounded shadow-sm" alt="@product.Name"
+                     onerror="if(!this.src.includes('placeholder.svg')){this.src='images/placeholder.svg';}" />
+            </div>
+            <div class="col-md-7">
+                <h2>@product.Name</h2>
+
+                @if (product.StockQuantity > 0)
+                {
+                    <span class="badge bg-success mb-3">In stock (@product.StockQuantity)</span>
+                }
+                else
+                {
+                    <span class="badge bg-secondary mb-3">Out of stock</span>
+                }
+
+                <p class="text-muted">@product.Description</p>
+                <h4 class="fw-bold mb-4">@product.Price.ToString("C")</h4>
+
+                <button class="btn btn-primary" disabled="@(product.StockQuantity == 0)"
+                        @onclick="AddToCart">
+                    <i class="bi bi-cart-plus"></i> Add to Cart
+                </button>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    private Product? product;
+    private bool loading = true;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        loading = true;
+        product = await ProductService.GetProductByIdAsync(Id);
+        loading = false;
+    }
+
+    private void AddToCart()
+    {
+        if (product is not null && product.StockQuantity > 0)
+        {
+            CartService.AddToCart(product);
+        }
+    }
+}

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300" role="img" aria-label="Webcam 1080p">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F06595"/><stop offset="1" stop-color="#E64980"/></linearGradient></defs>
+  <rect width="400" height="300" fill="url(#g)"/>
+  <g fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0.95">
+    <circle cx="200" cy="108" r="34"/>
+    <circle cx="200" cy="108" r="13"/>
+    <path d="M168 150 h64"/>
+  </g>
+  <text x="200" y="245" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="24" font-weight="600" fill="#ffffff" text-anchor="middle">Webcam 1080p</text>
+</svg>
