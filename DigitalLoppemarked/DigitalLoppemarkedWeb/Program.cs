@@ -4,7 +4,6 @@ using DigitalLoppemarkedLib.Service;
 using DigitalLoppemarkedWeb.Components;
 using Microsoft.AspNetCore.RateLimiting;
 using Npgsql;
-
 namespace DigitalLoppemarkedWeb;
 
 public class Program
@@ -21,14 +20,22 @@ public class Program
         // Én connection pool til hele appen
         builder.Services.AddSingleton(_ => new NpgsqlDataSourceBuilder(connString).Build());
 
+// ... (keep imports)
+
+// ... (rest)
+
+// Inside Main method:
         // Repositories (SQL ligger kun her)
         builder.Services.AddScoped<IProductRepository, ProductRepository>();
         builder.Services.AddScoped<IOrderRepository, OrderRepository>();
+        builder.Services.AddScoped<IUserRepository, UserRepository>();
 
         // Services (kun validering og forretningslogik)
         builder.Services.AddScoped<CartService>();
         builder.Services.AddScoped<ProductService>();
         builder.Services.AddScoped<OrderService>();
+        builder.Services.AddScoped<UserService>();
+
 
         // Rate limiting to curb scraping / DoS of the browse endpoints (story 3).
         // Fixed window per client IP; excess requests get HTTP 429.
