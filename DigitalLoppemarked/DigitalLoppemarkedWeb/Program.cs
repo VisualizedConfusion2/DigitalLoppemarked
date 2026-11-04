@@ -45,6 +45,8 @@ public class Program
         builder.Services.AddScoped<ProductService>();
         builder.Services.AddScoped<OrderService>();
         builder.Services.AddScoped<UserService>();
+        builder.Services.AddScoped<IEmailService, ConsoleEmailService>();
+
 
         // Rate limiting to prevent scraping / DoS (story 3).
         builder.Services.AddRateLimiter(options =>
@@ -111,6 +113,27 @@ public class Program
         });
 
         app.UseAntiforgery();
+
+        // Security Stamp Verification Middleware: Invalidate sessions globally if stamp changes
+        app.Use(async (context, next) =>
+        {
+            var userId = context.Session.GetInt32("UserId");
+            var sessionStamp = context.Session.GetString("SecurityStamp");
+
+            if (userId.HasValue && !string.IsNullOrEmpty(sessionStamp))
+            {
+                var userService = context.RequestServices.GetRequiredService<UserService>();
+                var userRepo = context.RequestServices.GetRequiredService<IUserRepository>();
+
+                var user = await userRepo.GetByIdAsync(userId.Value, default);
+                if (user == null || user.SecurityStamp != sessionStamp)
+                {
+                    context.Session.Clear();
+                    // Note: Redirection is handled by the UI/Components if they detect session loss
+                }
+            }
+            await next();
+        });
 
         app.MapStaticAssets();
         app.MapRazorComponents<App>()

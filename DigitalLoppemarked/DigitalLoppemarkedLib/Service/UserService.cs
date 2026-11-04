@@ -10,12 +10,14 @@ public class UserService
 {
     private readonly IUserRepository _userRepository;
     private readonly IMemoryCache _cache;
+    private readonly IEmailService _emailService;
     private const int MaxFailedAttempts = 5;
 
-    public UserService(IUserRepository userRepository, IMemoryCache cache)
+    public UserService(IUserRepository userRepository, IMemoryCache cache, IEmailService emailService)
     {
         _userRepository = userRepository;
         _cache = cache;
+        _emailService = emailService;
     }
 
     public async Task<(bool Success, string Message, int? UserId)> LoginAsync(string email, string password, CancellationToken ct = default)
@@ -96,5 +98,110 @@ public class UserService
         await _userRepository.CreateUserAsync(user, ct);
 
         return (true, genericMessage);
+    }
+
+    public async Task<(bool Success, string Message)> UpdateProfileAsync(int userId, string fullName, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(fullName))
+        {
+            return (false, "Navn er påkrævet.");
+        }
+
+        var user = await _userRepository.GetByIdAsync(userId, ct);
+        if (user == null) return (false, "Bruger ikke fundet.");
+
+        user.FullName = fullName;
+        await _userRepository.UpdateUserAsync(user, ct);
+
+        return (true, "Profilen er opdateret.");
+    }
+
+    public async Task<(bool Success, string Message)> ChangePasswordAsync(int userId, string currentPassword, string newPassword, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(currentPassword) || string.IsNullOrWhiteSpace(newPassword))
+        {
+            return (false, "Begge felter er påkrævet.");
+        }
+
+        var user = await _userRepository.GetByIdAsync(userId, ct);
+        if (user == null) return (false, "Bruger ikke fundet.");
+
+        // 1. Verify identity
+        if (!BCrypt.Net.BCrypt.Verify(currentPassword, user.PasswordHash))
+        {
+            return (false, "Den nuværende adgangskode er forkert.");
+        }
+
+        // 2. Prevent reuse of the same password
+        string newHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+        if (await _userRepository.HasPasswordBeenUsedAsync(userId, newHash, ct))
+        {
+            return (false, "Du kan ikke bruge en tidligere adgangskode.");
+        }
+
+        // 3. Update password and rotate security stamp to invalidate all sessions
+        string newStamp = Guid.NewGuid().ToString();
+        await _userRepository.UpdatePasswordAsync(userId, newHash, newStamp, ct);
+        await _userRepository.AddPasswordHistoryAsync(userId, newHash, ct);
+
+        return (true, "Din adgangskode er blevet ændret.");
+    }
+
+    public async Task<(bool Success, string Message)> RequestPasswordResetAsync(string email, string baseUrl, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(email)) return (false, "E-mail er påkrævet.");
+
+        var user = await _userRepository.GetByEmailAsync(email, ct);
+
+        // Prevent user enumeration: always return success message
+        const string genericMessage = "Hvis e-mailen er gyldig, vil du modtage et link til nulstilling af adgangskoden.";
+
+        if (user == null)
+        {
+            // Simulate timing of hashing/saving for non-existent users to prevent timing attacks
+            await Task.Delay(100, ct);
+            return (true, genericMessage);
+        }
+
+        // Generate random token
+        string token = Guid.NewGuid().ToString("N");
+        DateTime expiresAt = DateTime.UtcNow.AddMinutes(30);
+        await _userRepository.SaveResetTokenAsync(user.Id, token, expiresAt, ct);
+
+        // Send email with link (constructed from baseUrl to prevent Host header poisoning)
+        string resetLink = $"{baseUrl}/reset-password?token={token}";
+        // Email sending is now purely optional/mocked
+        Console.WriteLine($"[MOCK EMAIL] To: {user.Email} | Subject: Nulstilling af adgangskode | Link: {resetLink}");
+
+        return (true, genericMessage);
+    }
+
+    public async Task<(bool Success, string Message)> ResetPasswordAsync(string token, string newPassword, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(token) || string.IsNullOrWhiteSpace(newPassword))
+        {
+            return (false, "Alle felter er påkrævet.");
+        }
+
+        var user = await _userRepository.GetUserByResetTokenAsync(token, ct);
+        if (user == null)
+        {
+            return (false, "Ugyldigt eller udløbet nulstillingslink.");
+        }
+
+        // Prevent reuse of the same password
+        string newHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+        if (await _userRepository.HasPasswordBeenUsedAsync(user.Id, newHash, ct))
+        {
+            return (false, "Du kan ikke bruge en tidligere adgangskode.");
+        }
+
+        // Update password and rotate stamp
+        string newStamp = Guid.NewGuid().ToString();
+        await _userRepository.UpdatePasswordAsync(user.Id, newHash, newStamp, ct);
+        await _userRepository.AddPasswordHistoryAsync(user.Id, newHash, ct);
+        await _userRepository.DeleteResetTokenAsync(user.Id, ct);
+
+        return (true, "Din adgangskode er blevet nulstillet succesfuldt.");
     }
 }

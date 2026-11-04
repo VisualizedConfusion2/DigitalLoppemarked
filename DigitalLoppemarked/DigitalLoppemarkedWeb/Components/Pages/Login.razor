@@ -1,6 +1,7 @@
 @page "/login"
 @using Microsoft.AspNetCore.Components.Forms
 @using DigitalLoppemarkedLib.Service
+@using DigitalLoppemarkedLib.Data.Repositories
 @using Microsoft.AspNetCore.Components.Authorization
 @using System.ComponentModel.DataAnnotations
 @using Microsoft.AspNetCore.DataProtection
@@ -68,12 +69,18 @@
             var httpContext = HttpContextAccessor.HttpContext;
             if (httpContext != null)
             {
-                // Prevent session fixation: drop the current session and its cookie so the
-                // next request is issued a brand-new session id. The user id is handed over
-                // in a short-lived, data-protected ticket that the bootstrap middleware in
-                // Program.cs consumes exactly once.
+                // Prevent session fixation: drop the current session and its cookie
                 httpContext.Session.Clear();
                 httpContext.Response.Cookies.Delete(".AspNetCore.Session");
+
+                // We must also store the current SecurityStamp in the session so the
+                // middleware can detect global logouts if the stamp is rotated.
+                var userRepo = httpContext.RequestServices.GetRequiredService<IUserRepository>();
+                var user = await userRepo.GetByIdAsync(result.UserId!.Value, default);
+                if (user != null)
+                {
+                    httpContext.Session.SetString("SecurityStamp", user.SecurityStamp);
+                }
 
                 var protector = DataProtection.CreateProtector("LoginTicket");
                 httpContext.Response.Cookies.Append(

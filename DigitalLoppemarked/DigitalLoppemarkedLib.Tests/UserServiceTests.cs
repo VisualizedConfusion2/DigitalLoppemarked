@@ -10,14 +10,16 @@ namespace DigitalLoppemarkedLib.Tests;
 public class UserServiceTests
 {
     private readonly Mock<IUserRepository> _userRepoMock;
+    private readonly Mock<IEmailService> _emailServiceMock;
     private readonly IMemoryCache _cache;
     private readonly UserService _userService;
 
     public UserServiceTests()
     {
         _userRepoMock = new Mock<IUserRepository>();
+        _emailServiceMock = new Mock<IEmailService>();
         _cache = new MemoryCache(new MemoryCacheOptions());
-        _userService = new UserService(_userRepoMock.Object, _cache);
+        _userService = new UserService(_userRepoMock.Object, _cache, _emailServiceMock.Object);
     }
 
     // ---- 1. Registration Tests --------------------------------------------------

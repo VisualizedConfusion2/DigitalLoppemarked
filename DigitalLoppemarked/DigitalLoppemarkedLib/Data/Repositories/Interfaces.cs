@@ -37,4 +37,10 @@ public interface IUserRepository
     Task<User?> GetByIdAsync(int id, CancellationToken ct);
     Task<int> CreateUserAsync(User user, CancellationToken ct);
     Task UpdateUserAsync(User user, CancellationToken ct);
+    Task UpdatePasswordAsync(int userId, string newHash, string newStamp, CancellationToken ct);
+    Task<bool> HasPasswordBeenUsedAsync(int userId, string passwordHash, CancellationToken ct);
+    Task AddPasswordHistoryAsync(int userId, string passwordHash, CancellationToken ct);
+    Task SaveResetTokenAsync(int userId, string token, DateTime expiresAt, CancellationToken ct);
+    Task<User?> GetUserByResetTokenAsync(string token, CancellationToken ct);
+    Task DeleteResetTokenAsync(int userId, CancellationToken ct);
 }
