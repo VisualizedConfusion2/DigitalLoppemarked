@@ -18,18 +18,18 @@ public class UserService
         _cache = cache;
     }
 
-    public async Task<(bool Success, string Message)> LoginAsync(string email, string password, CancellationToken ct = default)
+    public async Task<(bool Success, string Message, int? UserId)> LoginAsync(string email, string password, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
         {
-            return (false, "E-mail og adgangskode er påkrævet.");
+            return (false, "E-mail og adgangskode er påkrævet.", null);
         }
 
         // 1. Brute force protection: Check failed attempts
         string cacheKey = $"login_attempts_{email}";
         if (_cache.TryGetValue(cacheKey, out int attempts) && attempts >= MaxFailedAttempts)
         {
-            return (false, "Kontoen er midlertidigt låst pga. for mange mislykkede forsøg. Prøv igen senere.");
+            return (false, "Kontoen er midlertidigt låst pga. for mange mislykkede forsøg. Prøv igen senere.", null);
         }
 
         var user = await _userRepository.GetByEmailAsync(email, ct);
@@ -43,13 +43,13 @@ public class UserService
         {
             // Increment failed attempts
             _cache.Set(cacheKey, attempts + 1, TimeSpan.FromMinutes(15));
-            return (false, "Ugyldig e-mail eller adgangskode.");
+            return (false, "Ugyldig e-mail eller adgangskode.", null);
         }
 
-        // 3. Success: Reset failed attempts
+        // 3. Success: reset failed attempts
         _cache.Remove(cacheKey);
 
-        return (true, "Login lykkedes.");
+        return (true, "Login lykkedes.", user.Id);
     }
 
     public async Task<(bool Success, string Message)> RegisterAsync(string email, string password, string fullName, bool gdprConsent, CancellationToken ct = default)
@@ -70,59 +70,31 @@ public class UserService
             return (false, "Du skal acceptere behandling af persondata.");
         }
 
-        // 2. Prevent User Enumeration (Story requirement)
-        // We check if user exists, but we return the same generic success message
-        // to the UI to avoid leaking whether an email is registered.
+        // 2. Prevent user enumeration: return the exact same message whether or not the
+        // e-mail already exists, so an attacker cannot tell registered e-mails apart.
+        const string genericMessage = "Din konto er oprettet. Du kan nu logge ind.";
+
         var existingUser = await _userRepository.GetByEmailAsync(email, ct);
         if (existingUser != null)
         {
-            return (true, "Hvis e-mailen er gyldig, vil du modtage en bekræftelsesmail.");
+            return (true, genericMessage);
         }
 
         // 3. Hash Password securely
         string passwordHash = BCrypt.Net.BCrypt.HashPassword(password);
 
-        // 4. Save User
+        // 4. Save the user as active immediately (no e-mail verification step).
         var user = new User
         {
             Email = email,
             PasswordHash = passwordHash,
             FullName = fullName,
             GdprConsent = gdprConsent,
-            IsActive = false
+            IsActive = true
         };
 
-        int userId = await _userRepository.CreateUserAsync(user, ct);
+        await _userRepository.CreateUserAsync(user, ct);
 
-        // 5. Create Verification Token
-        string token = Guid.NewGuid().ToString("N");
-        DateTime expiresAt = DateTime.UtcNow.AddHours(24);
-        await _userRepository.CreateVerificationTokenAsync(userId, token, expiresAt, ct);
-
-        // 6. Send Email (Mocked for now)
-        Console.WriteLine($"[MOCK EMAIL] To: {email} | Link: /verify?token={token}");
-
-        return (true, "Din konto er oprettet. Tjek din e-mail for at aktivere den.");
-    }
-
-    public async Task<(bool Success, string Message)> VerifyEmailAsync(string token, CancellationToken ct = default)
-    {
-        var userId = await _userRepository.GetUserIdByTokenAsync(token, ct);
-        if (userId == null)
-        {
-            return (false, "Ugyldig eller udløbet token.");
-        }
-
-        var user = await _userRepository.GetByIdAsync(userId.Value, ct);
-        if (user == null)
-        {
-            return (false, "Bruger findes ikke.");
-        }
-
-        user.IsActive = true;
-        await _userRepository.UpdateUserAsync(user, ct);
-        await _userRepository.DeleteVerificationTokenAsync(userId.Value, ct);
-
-        return (true, "Din konto er nu aktiveret!");
+        return (true, genericMessage);
     }
 }

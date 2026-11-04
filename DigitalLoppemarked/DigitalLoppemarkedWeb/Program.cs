@@ -2,6 +2,7 @@ using System.Threading.RateLimiting;
 using DigitalLoppemarkedLib.Data.Repositories;
 using DigitalLoppemarkedLib.Service;
 using DigitalLoppemarkedWeb.Components;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.RateLimiting;
 using Npgsql;
 namespace DigitalLoppemarkedWeb;
@@ -30,6 +31,9 @@ public class Program
             options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
             options.Cookie.SameSite = SameSiteMode.Strict;
         });
+
+        // Signs the short-lived post-login ticket used to regenerate the session id (story 2).
+        builder.Services.AddDataProtection();
 
         // Repositories: Handle all raw SQL queries.
         builder.Services.AddScoped<IProductRepository, ProductRepository>();
@@ -79,6 +83,33 @@ public class Program
         app.UseHttpsRedirection();
         app.UseRateLimiter();
         app.UseSession();
+
+        // Session-fixation mitigation: after the login redirect the old session cookie is
+        // gone, so this request gets a fresh session id. Populate it once from the signed
+        // "post_login" ticket, then delete the ticket.
+        app.Use(async (context, next) =>
+        {
+            const string ticketCookie = "post_login";
+            if (context.Session.GetInt32("UserId") is null &&
+                context.Request.Cookies.TryGetValue(ticketCookie, out var ticket) &&
+                !string.IsNullOrEmpty(ticket))
+            {
+                try
+                {
+                    var protector = context.RequestServices
+                        .GetRequiredService<IDataProtectionProvider>()
+                        .CreateProtector("LoginTicket");
+                    context.Session.SetInt32("UserId", int.Parse(protector.Unprotect(ticket)));
+                }
+                catch
+                {
+                    // Tampered or expired ticket: ignore and remain logged out.
+                }
+                context.Response.Cookies.Delete(ticketCookie);
+            }
+            await next();
+        });
+
         app.UseAntiforgery();
 
         app.MapStaticAssets();

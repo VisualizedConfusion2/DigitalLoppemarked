@@ -48,7 +48,8 @@ public class UserServiceTests
         Assert.True(result.Success);
         _userRepoMock.Verify(r => r.CreateUserAsync(It.Is<User>(u =>
             u.Email == email &&
-            u.PasswordHash != password),
+            u.PasswordHash != password &&
+            u.IsActive),
             It.IsAny<CancellationToken>()), Times.Once);
 
         // Verify password hash separately as BCrypt.Verify cannot be used inside Moq expression trees
@@ -70,11 +71,42 @@ public class UserServiceTests
         var hash = BCrypt.Net.BCrypt.HashPassword(password);
 
         _userRepoMock.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>()))
-                     .ReturnsAsync(new User { Email = email, PasswordHash = hash });
+                     .ReturnsAsync(new User { Email = email, PasswordHash = hash, IsActive = true });
 
         var result = await _userService.LoginAsync(email, password);
 
         Assert.True(result.Success);
+    }
+
+    [Fact]
+    public async Task LoginAsync_WithCorrectCredentials_ReturnsTheUsersId()
+    {
+        var email = "user@test.com";
+        var password = "password123";
+        var hash = BCrypt.Net.BCrypt.HashPassword(password);
+
+        _userRepoMock.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>()))
+                     .ReturnsAsync(new User { Id = 42, Email = email, PasswordHash = hash, IsActive = true });
+
+        var result = await _userService.LoginAsync(email, password);
+
+        Assert.True(result.Success);
+        Assert.Equal(42, result.UserId);
+    }
+
+    [Fact]
+    public async Task LoginAsync_WithWrongPassword_ReturnsNullUserId()
+    {
+        var email = "user@test.com";
+        var hash = BCrypt.Net.BCrypt.HashPassword("correct_password");
+
+        _userRepoMock.Setup(r => r.GetByEmailAsync(email, It.IsAny<CancellationToken>()))
+                     .ReturnsAsync(new User { Id = 42, Email = email, PasswordHash = hash });
+
+        var result = await _userService.LoginAsync(email, "wrong_password");
+
+        Assert.False(result.Success);
+        Assert.Null(result.UserId);
     }
 
     [Fact]

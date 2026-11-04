@@ -1,5 +1,6 @@
-﻿@inherits Microsoft.AspNetCore.Components.LayoutComponentBase
+@inherits Microsoft.AspNetCore.Components.LayoutComponentBase
 @inject IHttpContextAccessor HttpContextAccessor
+@inject NavigationManager NavManager
 
 <div class="page">
     <div class="sidebar">
@@ -15,7 +16,11 @@
             }
             else
             {
-                <a href="logout">Log ud</a>
+                @* Logout is a POST protected by an antiforgery token (story 2),
+                   so it cannot be triggered by a cross-site GET. *@
+                <EditForm Model="LogoutModel" FormName="logout" OnValidSubmit="DoLogout" class="d-inline">
+                    <button type="submit" class="btn btn-link p-0 align-baseline me-2">Log ud</button>
+                </EditForm>
             }
         </div>
 
@@ -30,3 +35,18 @@
     <a href="." class="reload">Reload</a>
     <span class="dismiss">🗙</span>
 </div>
+
+@code {
+    // Plain instance (no [SupplyParameterFromForm]): logout submits no fields, we only
+    // need the named form + antiforgery token + OnValidSubmit to fire.
+    private readonly LogoutForm LogoutModel = new();
+
+    private void DoLogout()
+    {
+        // Server-side session invalidation (not just dropping the cookie).
+        HttpContextAccessor.HttpContext?.Session.Clear();
+        NavManager.NavigateTo("/", forceLoad: true);
+    }
+
+    private sealed class LogoutForm { }
+}

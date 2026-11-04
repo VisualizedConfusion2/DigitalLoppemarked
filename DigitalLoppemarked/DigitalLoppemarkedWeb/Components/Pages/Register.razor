@@ -19,7 +19,7 @@
                         </div>
                     }
 
-                    <EditForm Model="regModel" OnValidSubmit="HandleRegistration">
+                    <EditForm Model="regModel" OnValidSubmit="HandleRegistration" FormName="registerForm">
                         <DataAnnotationsValidator />
 
                         <div class="mb-3">
@@ -58,7 +58,8 @@
 </div>
 
 @code {
-    private RegistrationModel regModel = new();
+    [SupplyParameterFromForm]
+    private RegistrationModel regModel { get; set; } = new();
     private string message = "";
     private bool isError = false;
 

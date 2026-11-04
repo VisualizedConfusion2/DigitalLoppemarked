@@ -29,7 +29,7 @@ public interface IOrderRepository
 }
 
 /// <summary>
-/// Handles user account data, including authentication and verification.
+/// Handles user account data and authentication.
 /// </summary>
 public interface IUserRepository
 {
@@ -37,7 +37,4 @@ public interface IUserRepository
     Task<User?> GetByIdAsync(int id, CancellationToken ct);
     Task<int> CreateUserAsync(User user, CancellationToken ct);
     Task UpdateUserAsync(User user, CancellationToken ct);
-    Task CreateVerificationTokenAsync(int userId, string token, DateTime expiresAt, CancellationToken ct);
-    Task<int?> GetUserIdByTokenAsync(string token, CancellationToken ct);
-    Task DeleteVerificationTokenAsync(int userId, CancellationToken ct);
 }

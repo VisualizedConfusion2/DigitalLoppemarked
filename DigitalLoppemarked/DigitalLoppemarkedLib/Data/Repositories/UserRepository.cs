@@ -55,11 +55,12 @@ public class UserRepository : IUserRepository
     public async Task<int> CreateUserAsync(User user, CancellationToken ct)
     {
         await using var cmd = _dataSource.CreateCommand(
-            "INSERT INTO users (email, password_hash, full_name, gdpr_consent) VALUES (@email, @hash, @name, @gdpr) RETURNING id");
+            "INSERT INTO users (email, password_hash, full_name, gdpr_consent, is_active) VALUES (@email, @hash, @name, @gdpr, @active) RETURNING id");
         cmd.Parameters.AddWithValue("email", user.Email);
         cmd.Parameters.AddWithValue("hash", user.PasswordHash);
         cmd.Parameters.AddWithValue("name", user.FullName);
         cmd.Parameters.AddWithValue("gdpr", user.GdprConsent);
+        cmd.Parameters.AddWithValue("active", user.IsActive);
 
         return (int)await cmd.ExecuteScalarAsync(ct);
     }
@@ -75,31 +76,4 @@ public class UserRepository : IUserRepository
         await cmd.ExecuteNonQueryAsync(ct);
     }
 
-    public async Task CreateVerificationTokenAsync(int userId, string token, DateTime expiresAt, CancellationToken ct)
-    {
-        await using var cmd = _dataSource.CreateCommand(
-            "INSERT INTO user_verification_tokens (user_id, token, expires_at) VALUES (@uid, @token, @exp)");
-        cmd.Parameters.AddWithValue("uid", userId);
-        cmd.Parameters.AddWithValue("token", token);
-        cmd.Parameters.AddWithValue("exp", expiresAt);
-
-        await cmd.ExecuteNonQueryAsync(ct);
-    }
-
-    public async Task<int?> GetUserIdByTokenAsync(string token, CancellationToken ct)
-    {
-        await using var cmd = _dataSource.CreateCommand("SELECT user_id FROM user_verification_tokens WHERE token = @token");
-        cmd.Parameters.AddWithValue("token", token);
-
-        var result = await cmd.ExecuteScalarAsync(ct);
-        return result == null ? null : (int)result;
-    }
-
-    public async Task DeleteVerificationTokenAsync(int userId, CancellationToken ct)
-    {
-        await using var cmd = _dataSource.CreateCommand("DELETE FROM user_verification_tokens WHERE user_id = @uid");
-        cmd.Parameters.AddWithValue("uid", userId);
-
-        await cmd.ExecuteNonQueryAsync(ct);
-    }
 }

@@ -10,10 +10,3 @@ public class User
     public DateTime CreatedAt { get; set; }
     public bool GdprConsent { get; set; }
 }
-
-public class UserVerificationToken
-{
-    public int UserId { get; set; }
-    public string Token { get; set; } = string.Empty;
-    public DateTime ExpiresAt { get; set; }
-}

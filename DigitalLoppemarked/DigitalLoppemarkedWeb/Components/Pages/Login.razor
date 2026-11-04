@@ -3,9 +3,11 @@
 @using DigitalLoppemarkedLib.Service
 @using Microsoft.AspNetCore.Components.Authorization
 @using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.DataProtection
 @inject UserService UserService
 @inject IHttpContextAccessor HttpContextAccessor
 @inject NavigationManager NavManager
+@inject IDataProtectionProvider DataProtection
 
 <PageTitle>Log ind</PageTitle>
 
@@ -51,7 +53,8 @@
 </div>
 
 @code {
-    private LoginModel loginModel = new();
+    [SupplyParameterFromForm]
+    private LoginModel loginModel { get; set; } = new();
     private string? errorMessage;
 
     private async Task HandleLogin()
@@ -65,9 +68,24 @@
             var httpContext = HttpContextAccessor.HttpContext;
             if (httpContext != null)
             {
-                // Regenerate session by clearing and setting new values
+                // Prevent session fixation: drop the current session and its cookie so the
+                // next request is issued a brand-new session id. The user id is handed over
+                // in a short-lived, data-protected ticket that the bootstrap middleware in
+                // Program.cs consumes exactly once.
                 httpContext.Session.Clear();
-                httpContext.Session.SetInt32("UserId", 1); // In a real app, get ID from UserService.LoginAsync result
+                httpContext.Response.Cookies.Delete(".AspNetCore.Session");
+
+                var protector = DataProtection.CreateProtector("LoginTicket");
+                httpContext.Response.Cookies.Append(
+                    "post_login",
+                    protector.Protect(result.UserId!.Value.ToString()),
+                    new CookieOptions
+                    {
+                        HttpOnly = true,
+                        Secure = true,
+                        SameSite = SameSiteMode.Strict,
+                        MaxAge = TimeSpan.FromMinutes(2)
+                    });
 
                 NavManager.NavigateTo("/", forceLoad: true);
             }
