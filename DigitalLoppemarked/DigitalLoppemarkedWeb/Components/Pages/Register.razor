@@ -1,0 +1,100 @@
+@page "/register"
+@inject DigitalLoppemarkedLib.Service.UserService UserService
+@using System.ComponentModel.DataAnnotations
+
+<PageTitle>Opret Konto</PageTitle>
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0">Opret en konto</h3>
+                </div>
+                <div class="card-body">
+                    @if (!string.IsNullOrEmpty(message))
+                    {
+                        <div class="alert @(isError ? "alert-danger" : "alert-success")">
+                            @message
+                        </div>
+                    }
+
+                    <EditForm Model="regModel" OnValidSubmit="HandleRegistration">
+                        <DataAnnotationsValidator />
+
+                        <div class="mb-3">
+                            <label class="form-label">Fulde navn</label>
+                            <InputText @bind-Value="regModel.FullName" class="form-control" placeholder="Indtast dit fulde navn" />
+                            <ValidationMessage For="@(() => regModel.FullName)" class="text-danger" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">E-mail</label>
+                            <InputText @bind-Value="regModel.Email" class="form-control" placeholder="email@eksempel.dk" />
+                            <ValidationMessage For="@(() => regModel.Email)" class="text-danger" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Adgangskode</label>
+                            <InputText @bind-Value="regModel.Password" type="password" class="form-control" placeholder="Vælg en sikker adgangskode" />
+                            <ValidationMessage For="@(() => regModel.Password)" class="text-danger" />
+                        </div>
+
+                        <div class="mb-3 form-check">
+                            <InputCheckbox @bind-Value="regModel.GdprConsent" class="form-check-input" id="gdprCheck" />
+                            <label class="form-check-label" for="gdprCheck">
+                                Jeg accepterer behandling af mine persondata i henhold til GDPR.
+                            </label>
+                        </div>
+
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg">Opret konto</button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private RegistrationModel regModel = new();
+    private string message = "";
+    private bool isError = false;
+
+    private async Task HandleRegistration()
+    {
+        message = "";
+        var result = await UserService.RegisterAsync(
+            regModel.Email,
+            regModel.Password,
+            regModel.FullName,
+            regModel.GdprConsent
+        );
+
+        isError = !result.Success;
+        message = result.Message;
+
+        if (result.Success)
+        {
+            regModel = new(); // Reset form
+        }
+    }
+
+    public class RegistrationModel
+    {
+        [Required(ErrorMessage = "Navn er påkrævet")]
+        public string FullName { get; set; } = "";
+
+        [Required(ErrorMessage = "E-mail er påkrævet")]
+        [EmailAddress(ErrorMessage = "Ugyldig e-mail adresse")]
+        public string Email { get; set; } = "";
+
+        [Required(ErrorMessage = "Adgangskode er påkrævet")]
+        [MinLength(8, ErrorMessage = "Adgangskoden skal være mindst 8 tegn")]
+        public string Password { get; set; } = "";
+
+        [Range(typeof(bool), "true", "true", ErrorMessage = "Du skal acceptere GDPR")]
+        public bool GdprConsent { get; set; }
+    }
+}
