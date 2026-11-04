@@ -26,6 +26,7 @@ public class Program
 
 // Inside Main method:
         builder.Services.AddDistributedMemoryCache();
+        builder.Services.AddMemoryCache();
         builder.Services.AddHttpContextAccessor();
         builder.Services.AddSession(options =>
         {
