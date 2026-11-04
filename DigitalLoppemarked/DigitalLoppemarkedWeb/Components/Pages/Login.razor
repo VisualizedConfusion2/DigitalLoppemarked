@@ -1,0 +1,85 @@
+@page "/login"
+@using Microsoft.AspNetCore.Components.Forms
+@using DigitalLoppemarkedLib.Service
+@using Microsoft.AspNetCore.Components.Authorization
+@using System.ComponentModel.DataAnnotations
+@inject UserService UserService
+@inject IHttpContextAccessor HttpContextAccessor
+@inject NavigationManager NavManager
+
+<PageTitle>Log ind</PageTitle>
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h3>Log ind</h3>
+                </div>
+                <div class="card-body">
+                    <EditForm Model="@loginModel" OnValidSubmit="HandleLogin" FormName="loginForm">
+                        <DataAnnotationsValidator />
+
+                        <div class="mb-3">
+                            <label class="form-label">E-mail</label>
+                            <InputText @bind-Value="loginModel.Email" class="form-control" />
+                            <ValidationMessage For="@(() => loginModel.Email)" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Adgangskode</label>
+                            <InputText @bind-Value="loginModel.Password" type="password" class="form-control" />
+                            <ValidationMessage For="@(() => loginModel.Password)" />
+                        </div>
+
+                        @if (!string.IsNullOrEmpty(errorMessage))
+                        {
+                            <div class="alert alert-danger">@errorMessage</div>
+                        }
+
+                        <button type="submit" class="btn btn-primary w-100">Log ind</button>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private LoginModel loginModel = new();
+    private string? errorMessage;
+
+    private async Task HandleLogin()
+    {
+        errorMessage = null;
+
+        var result = await UserService.LoginAsync(loginModel.Email, loginModel.Password);
+
+        if (result.Success)
+        {
+            var httpContext = HttpContextAccessor.HttpContext;
+            if (httpContext != null)
+            {
+                // Regenerate session by clearing and setting new values
+                httpContext.Session.Clear();
+                httpContext.Session.SetInt32("UserId", 1); // In a real app, get ID from UserService.LoginAsync result
+
+                NavManager.NavigateTo("/", forceLoad: true);
+            }
+        }
+        else
+        {
+            errorMessage = result.Message;
+        }
+    }
+
+    public class LoginModel
+    {
+        [Required(ErrorMessage = "E-mail er påkrævet")]
+        [EmailAddress(ErrorMessage = "Ugyldig e-mail format")]
+        public string Email { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Adgangskode er påkrævet")]
+        public string Password { get; set; } = string.Empty;
+    }
+}

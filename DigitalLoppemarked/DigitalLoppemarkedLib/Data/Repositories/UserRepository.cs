@@ -20,20 +20,7 @@ public class UserRepository : IUserRepository
         cmd.Parameters.AddWithValue("email", email);
 
         await using var reader = await cmd.ExecuteReaderAsync(ct);
-        if (await reader.ReadAsync(ct))
-        {
-            return new User
-            {
-                Id = reader.GetInt32(0),
-                Email = reader.GetString(1),
-                PasswordHash = reader.GetString(2),
-                FullName = reader.GetString(3),
-                IsActive = reader.GetBoolean(4),
-                CreatedAt = reader.GetDateTime(5),
-                GdprConsent = reader.GetBoolean(6)
-            };
-        }
-        return null;
+        return await reader.ReadAsync(ct) ? MapUser(reader) : null;
     }
 
     public async Task<User?> GetByIdAsync(int id, CancellationToken ct)
@@ -42,20 +29,21 @@ public class UserRepository : IUserRepository
         cmd.Parameters.AddWithValue("id", id);
 
         await using var reader = await cmd.ExecuteReaderAsync(ct);
-        if (await reader.ReadAsync(ct))
+        return await reader.ReadAsync(ct) ? MapUser(reader) : null;
+    }
+
+    private User MapUser(NpgsqlDataReader reader)
+    {
+        return new User
         {
-            return new User
-            {
-                Id = reader.GetInt32(0),
-                Email = reader.GetString(1),
-                PasswordHash = reader.GetString(2),
-                FullName = reader.GetString(3),
-                IsActive = reader.GetBoolean(4),
-                CreatedAt = reader.GetDateTime(5),
-                GdprConsent = reader.GetBoolean(6)
-            };
-        }
-        return null;
+            Id = reader.GetInt32(0),
+            Email = reader.GetString(1),
+            PasswordHash = reader.GetString(2),
+            FullName = reader.GetString(3),
+            IsActive = reader.GetBoolean(4),
+            CreatedAt = reader.GetDateTime(5),
+            GdprConsent = reader.GetBoolean(6)
+        };
     }
 
     public async Task<int> CreateUserAsync(User user, CancellationToken ct)

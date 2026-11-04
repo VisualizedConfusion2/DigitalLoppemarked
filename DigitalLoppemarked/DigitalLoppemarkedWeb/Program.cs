@@ -25,12 +25,24 @@ public class Program
 // ... (rest)
 
 // Inside Main method:
-        // Repositories (SQL ligger kun her)
+        builder.Services.AddDistributedMemoryCache();
+        builder.Services.AddHttpContextAccessor();
+        builder.Services.AddSession(options =>
+        {
+            options.IdleTimeout = TimeSpan.FromMinutes(30);
+            options.Cookie.HttpOnly = true;
+            options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+            options.Cookie.SameSite = SameSiteMode.Strict;
+        });
+
+        // Repositories: These handle all raw SQL queries.
+        // Scoped lifetime is used so a new instance is created per HTTP request.
         builder.Services.AddScoped<IProductRepository, ProductRepository>();
         builder.Services.AddScoped<IOrderRepository, OrderRepository>();
         builder.Services.AddScoped<IUserRepository, UserRepository>();
 
-        // Services (kun validering og forretningslogik)
+        // Services: These contain the business logic and validation.
+        // They depend on repositories for data access.
         builder.Services.AddScoped<CartService>();
         builder.Services.AddScoped<ProductService>();
         builder.Services.AddScoped<OrderService>();
@@ -81,7 +93,7 @@ public class Program
         app.UseHttpsRedirection();
 
         app.UseRateLimiter();
-
+        app.UseSession();
         app.UseAntiforgery();
 
         app.MapStaticAssets();
