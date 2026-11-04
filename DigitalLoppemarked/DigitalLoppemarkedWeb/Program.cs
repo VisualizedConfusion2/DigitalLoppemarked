@@ -1,7 +1,9 @@
 using System.Threading.RateLimiting;
+using DigitalLoppemarkedLib.Data.Repositories;
 using DigitalLoppemarkedLib.Service;
 using DigitalLoppemarkedWeb.Components;
 using Microsoft.AspNetCore.RateLimiting;
+using Npgsql;
 
 namespace DigitalLoppemarkedWeb;
 
@@ -11,6 +13,19 @@ public class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
+        // Connection string fra user secrets (Development) eller miljøvariabler (produktion)
+        var connString = builder.Configuration.GetConnectionString("Loppemarked")
+            ?? throw new InvalidOperationException(
+                "Connection string 'Loppemarked' mangler. Kør dotnet user-secrets set i web-projektet.");
+
+        // Én connection pool til hele appen
+        builder.Services.AddSingleton(_ => new NpgsqlDataSourceBuilder(connString).Build());
+
+        // Repositories (SQL ligger kun her)
+        builder.Services.AddScoped<IProductRepository, ProductRepository>();
+        builder.Services.AddScoped<IOrderRepository, OrderRepository>();
+
+        // Services (kun validering og forretningslogik)
         builder.Services.AddScoped<CartService>();
         builder.Services.AddScoped<ProductService>();
         builder.Services.AddScoped<OrderService>();
