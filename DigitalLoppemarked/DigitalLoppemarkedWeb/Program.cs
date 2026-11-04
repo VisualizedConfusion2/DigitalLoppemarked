@@ -12,19 +12,14 @@ public class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
-        // Connection string fra user secrets (Development) eller miljøvariabler (produktion)
+        // Connection string from user secrets (Development) or environment variables (production)
         var connString = builder.Configuration.GetConnectionString("Loppemarked")
             ?? throw new InvalidOperationException(
-                "Connection string 'Loppemarked' mangler. Kør dotnet user-secrets set i web-projektet.");
+                "Connection string 'Loppemarked' is missing. Run dotnet user-secrets set in the web project.");
 
-        // Én connection pool til hele appen
+        // One connection pool for the entire app
         builder.Services.AddSingleton(_ => new NpgsqlDataSourceBuilder(connString).Build());
 
-// ... (keep imports)
-
-// ... (rest)
-
-// Inside Main method:
         builder.Services.AddDistributedMemoryCache();
         builder.Services.AddMemoryCache();
         builder.Services.AddHttpContextAccessor();
@@ -36,22 +31,18 @@ public class Program
             options.Cookie.SameSite = SameSiteMode.Strict;
         });
 
-        // Repositories: These handle all raw SQL queries.
-        // Scoped lifetime is used so a new instance is created per HTTP request.
+        // Repositories: Handle all raw SQL queries.
         builder.Services.AddScoped<IProductRepository, ProductRepository>();
         builder.Services.AddScoped<IOrderRepository, OrderRepository>();
         builder.Services.AddScoped<IUserRepository, UserRepository>();
 
-        // Services: These contain the business logic and validation.
-        // They depend on repositories for data access.
+        // Services: Contain business logic and validation.
         builder.Services.AddScoped<CartService>();
         builder.Services.AddScoped<ProductService>();
         builder.Services.AddScoped<OrderService>();
         builder.Services.AddScoped<UserService>();
 
-
-        // Rate limiting to curb scraping / DoS of the browse endpoints (story 3).
-        // Fixed window per client IP; excess requests get HTTP 429.
+        // Rate limiting to prevent scraping / DoS (story 3).
         builder.Services.AddRateLimiter(options =>
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
@@ -65,10 +56,7 @@ public class Program
                         QueueLimit = 0
                     }));
 
-            // Dedicated, tighter policy for search (story 7). It guards the HTTP-rendered
-            // search path; interactive searches over the SignalR circuit are additionally
-            // throttled per-circuit inside Home.razor, since those don't flow through this
-            // request-pipeline middleware.
+            // Specific policy for search (story 7).
             options.AddFixedWindowLimiter("search", o =>
             {
                 o.PermitLimit = 20;
@@ -77,22 +65,18 @@ public class Program
             });
         });
 
-        // Add services to the container.
         builder.Services.AddRazorComponents()
             .AddInteractiveServerComponents();
 
         var app = builder.Build();
 
-        // Configure the HTTP request pipeline.
         if (!app.Environment.IsDevelopment())
         {
             app.UseExceptionHandler("/Error");
-            // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
             app.UseHsts();
         }
 
         app.UseHttpsRedirection();
-
         app.UseRateLimiter();
         app.UseSession();
         app.UseAntiforgery();

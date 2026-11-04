@@ -5,6 +5,9 @@ using System.Data;
 
 namespace DigitalLoppemarkedLib.Data.Repositories;
 
+/// <summary>
+/// Repository for managing User data in the database.
+/// </summary>
 public class UserRepository : IUserRepository
 {
     private readonly NpgsqlDataSource _dataSource;
@@ -32,6 +35,9 @@ public class UserRepository : IUserRepository
         return await reader.ReadAsync(ct) ? MapUser(reader) : null;
     }
 
+    /// <summary>
+    /// Maps a database reader row to a User model.
+    /// </summary>
     private User MapUser(NpgsqlDataReader reader)
     {
         return new User

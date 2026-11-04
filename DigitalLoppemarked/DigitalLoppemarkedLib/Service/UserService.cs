@@ -53,8 +53,6 @@ public class UserService
     }
 
     public async Task<(bool Success, string Message)> RegisterAsync(string email, string password, string fullName, bool gdprConsent, CancellationToken ct = default)
-// ... (rest of the file)
-
     {
         // 1. Basic Validation
         if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password) || string.IsNullOrWhiteSpace(fullName))
@@ -78,8 +76,6 @@ public class UserService
         var existingUser = await _userRepository.GetByEmailAsync(email, ct);
         if (existingUser != null)
         {
-            // In a real app, we would send a "You already have an account" email.
-            // For now, we simulate success to the UI.
             return (true, "Hvis e-mailen er gyldig, vil du modtage en bekræftelsesmail.");
         }
 
